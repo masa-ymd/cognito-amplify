@@ -17,24 +17,7 @@ localhost:5000 - テナント専用ドメイン (React)
 
 ## AWSコンソールでの作業指示
 
-### 1. Cognitoアプリクライアントの作成 (login-app用)
-
-`login-app`はAmplifyの認証セッション管理のためにCognitoアプリクライアントと連携します。
-
-1.  **AWSコンソール**にログインし、**Amazon Cognito**サービスを開きます。
-2.  **User pools**を選択し、既存のUser Pool（`YOUR_USER_POOL_ID`）を選択します。
-3.  左側のナビゲーションメニューから **[App integration]** をクリックします。
-4.  **[App clients]** セクションで **[Create app client]** をクリックします。
-
-#### アプリケーションクライアント設定
-
-*   **アプリケーションタイプ**: `Single-page application (SPA)` を選択します。
-*   **アプリケーションに名前を付ける**: `login-app-client` のような識別しやすい名前を入力します。
-*   **リターン URL**: `http://localhost:3000` を入力します。
-
-5.  画面下部の **[アプリケーションクライアントを作成]** ボタンをクリックします。
-
-### 2. Cognitoアプリクライアントの作成 (callback-service用)
+### 1. Cognitoアプリクライアントの作成 (callback-service用)
 
 `callback-service`はユーザー名とパスワードを受け取り、サーバーサイドでCognitoの認証APIを呼び出すため、クライアントシークレットを持つアプリクライアントが必要です。
 
@@ -57,13 +40,12 @@ localhost:5000 - テナント専用ドメイン (React)
 
 5.  画面下部の **[アプリケーションクライアントを作成]** ボタンをクリックします。
 
-### 3. 作成後の設定値確認
+### 2. 作成後の設定値確認
 
 各アプリクライアント作成後、以下の値を確認してください：
 
 *   **User Pool ID**: `YOUR_USER_POOL_ID` (環境固有の値)
-*   **login-app-client の App client ID**: （手順1で作成したクライアントID）
-*   **callback-service-client の App client ID**: （手順2で作成したクライアントID）
+*   **callback-service-client の App client ID**: （手順1で作成したクライアントID）
 *   **callback-service-client の App client secret**: （手順2で生成されたクライアントシークレット）
 *   **Cognito ドメイン**: `https://your-domain-prefix.auth.ap-northeast-1.amazoncognito.com`
     *   **注意**: このドメインは、`callback-service`がJWKSエンドポイントやUserInfoエンドポイントを呼び出すために使用します。
@@ -130,12 +112,7 @@ cd tenant-app && npm install && cd ..
 
 ### 2. 環境変数の設定
 
-#### login-app/.env
 
-```env
-VITE_COGNITO_USER_POOL_ID=YOUR_USER_POOL_ID
-VITE_COGNITO_APP_CLIENT_ID=YOUR_APP_CLIENT_ID
-```
 
 #### callback-service/.env
 

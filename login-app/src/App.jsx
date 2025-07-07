@@ -1,6 +1,21 @@
 import { useState } from 'react';
-import { AWS_CONFIG, TENANTS } from './config/awsConfig';
 import './App.css';
+
+// テナント設定（本番環境ではDB管理を推奨）
+const TENANTS = {
+  'tenant1': {
+    id: 'tenant1',
+    name: 'テナント1',
+    domain: 'tenant1.example.com',
+    redirectUrl: 'http://localhost:5000?tenant=tenant1'
+  },
+  'tenant2': {
+    id: 'tenant2',
+    name: 'テナント2',
+    domain: 'tenant2.example.com',
+    redirectUrl: 'http://localhost:5000?tenant=tenant2'
+  }
+};
 
 function App() {
   const [selectedTenant, setSelectedTenant] = useState('');
