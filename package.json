@@ -1,0 +1,30 @@
+{
+  "name": "cognito-amplify-multitenancy-demo",
+  "version": "1.0.0",
+  "description": "マルチテナント構成でのCognito + Amplify検証環境",
+  "private": true,
+  "workspaces": [
+    "login-app",
+    "callback-service",
+    "tenant-app"
+  ],
+  "scripts": {
+    "install-all": "npm install && npm install --prefix login-app && npm install --prefix callback-service && npm install --prefix tenant-app",
+    "dev:login": "cd login-app && npm run dev",
+    "dev:callback": "cd callback-service && npm run dev",
+    "dev:tenant": "cd tenant-app && npm run dev",
+    "dev:all": "concurrently \"npm run dev:login\" \"npm run dev:callback\" \"npm run dev:tenant\"",
+    "start": "npm run dev:all"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "cognito",
+    "amplify",
+    "multitenancy",
+    "aws"
+  ],
+  "author": "",
+  "license": "ISC"
+} 

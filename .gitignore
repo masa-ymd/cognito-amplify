@@ -1,0 +1,20 @@
+# Environments
+.env
+
+# dependencies
+node_modules
+
+# IDEs
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Build artifacts
+dist
+build
+
+# OS generated files
+.DS_Store
+thumbs.db
