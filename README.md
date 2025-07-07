@@ -20,7 +20,7 @@ localhost:5000 - テナント専用ドメイン (React)
 ### 1. Cognitoアプリクライアントの作成
 
 1.  **AWSコンソール**にログインし、**Amazon Cognito**サービスを開きます。
-2.  **User pools**を選択し、既存のUser Pool（`ap-northeast-1_ZEGsv1lfy`）を選択します。
+2.  **User pools**を選択し、既存のUser Pool（`YOUR_USER_POOL_ID`）を選択します。
 3.  左側のナビゲーションメニューから **[App integration]** をクリックします。
 4.  **[App clients]** セクションで **[Create app client]** をクリックします。
 
@@ -59,7 +59,7 @@ localhost:5000 - テナント専用ドメイン (React)
 ### 1. トークン連携方法の変更とリスク
 
 *   **現在の実装**: `callback-service`は認証情報を簡易的なインメモリストアに保存し、その`sessionId`をURLパラメータとして`tenant-app`に渡します。`tenant-app`は`sessionId`を使って`callback-service`のAPIを呼び出し、認証情報を取得します。
-*   **リスク**: `sessionId`自体は機密情報ではありませんが、URLパラメータとして渡されるため、ブラウザ履歴、リファラーヘッダー、サーバーログなどに記録される可能性があります。`sessionId`が漏洩した場合、有効期限内であれば認証情報が取得されるリスクがあります。
+*   **リスク**: `sessionId`自体は機密情報ではありませんが、URLパラメータとして渡されるため、ブラウザ履歴、リファラーヘッダー、サーバーログなどによる漏洩リスクがあります。`sessionId`が漏洩した場合、有効期限内であれば認証情報が取得されるリスクがあります。
 *   **推奨対策**: 本番環境では、`sessionId`をURLパラメータではなく、HttpOnlyかつSecure属性を持つCookieとして設定するか、より堅牢なセッション管理（例: Redis, DynamoDB）と組み合わせるべきです。
 
 ### 2. テナント所属確認の仮実装
@@ -156,6 +156,31 @@ npm start
 *   **テナント専用ドメイン**: http://localhost:5000
 
 ## 認証フロー
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LoginApp as 共通ログイン画面 (localhost:3000)
+    participant Cognito as Amazon Cognito
+    participant CallbackService as 中間サービス (localhost:4000)
+    participant TenantApp as テナント専用ドメイン (localhost:5000)
+
+    User->>LoginApp: 1. ユーザー名/パスワード/テナントID入力
+    LoginApp->>Cognito: 2. Amplify.signIn(ユーザー名, パスワード)
+    Note right of Cognito: Cognito User Pool Authentication API (Direct API Call)<br/>(OAuth 2.0 Resource Owner Password Credentials Grant-like, handled securely by Amplify)
+    Cognito-->>LoginApp: 3. 認証成功 (ID/Access TokenをLoginAppに返す)
+    Note left of LoginApp: Tokens obtained via direct API response
+    LoginApp->>CallbackService: 4. POST /auth/process-token (ID/Access Token, Tenant ID)
+    Note right of CallbackService: Custom API Call (not standard OAuth/OIDC protocol)
+    CallbackService->>CallbackService: 5. IDトークン検証 (OpenID Connect)<br/>テナント所属確認 (カスタム)<br/>認証情報を簡易ストアに保存 & sessionId生成
+    CallbackService-->>LoginApp: 6. リダイレクトURLを返す (sessionIdを含む)
+    LoginApp->>TenantApp: 7. ブラウザをリダイレクト (sessionIdをURLに含む)
+    Note right of TenantApp: Standard browser redirect
+    TenantApp->>CallbackService: 8. GET /api/session-data?sessionId=<br/>(セッションデータ取得リクエスト)
+    Note right of CallbackService: Custom API Call (not standard OAuth/OIDC protocol)
+    CallbackService-->>TenantApp: 9. セッションデータ返却 & ストアから削除
+    TenantApp->>User: 10. ユーザー情報/トークン表示
+```
 
 1.  ユーザーが `localhost:3000` でテナントを選択し、ユーザー名とパスワードを入力してログイン。
 2.  `login-app` が Amplify を使用して Cognito の認証APIを直接呼び出し、認証セッションを確立し、IDトークンとアクセストークンを取得。
