@@ -1,11 +1,6 @@
 import { useState } from 'react';
-import { Amplify } from 'aws-amplify';
-import { signIn, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import { AWS_CONFIG, TENANTS } from './config/awsConfig';
 import './App.css';
-
-// Amplifyの設定
-Amplify.configure(AWS_CONFIG);
 
 function App() {
   const [selectedTenant, setSelectedTenant] = useState('');
@@ -15,13 +10,6 @@ function App() {
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    // 既存のセッションをクリア（開発時のデバッグ用）
-    try {
-      await signOut();
-    } catch (e) {
-      // console.warn('Amplify signOut failed or no user signed in:', e);
-    }
-
     if (!selectedTenant) {
       setError('テナントを選択してください');
       return;
@@ -35,39 +23,22 @@ function App() {
     setError('');
 
     try {
-      // Amplifyを使ってCognitoで認証
-      const { isSignedIn, nextStep } = await signIn({ username, password });
-
-      if (!isSignedIn || nextStep.signInStep !== 'DONE') {
-        throw new Error('認証が完了しませんでした。');
-      }
-
-      // 認証セッションからトークンを取得
-      const { tokens } = await fetchAuthSession();
-
-      const idToken = tokens?.idToken?.toString();
-      const accessToken = tokens?.accessToken?.toString();
-
-      if (!idToken || !accessToken) {
-        throw new Error('IDトークンまたはアクセストークンが取得できませんでした。');
-      }
-
-      // 認証成功後、callback-serviceにトークンを送信してリダイレクトを依頼
-      const response = await fetch('http://localhost:4000/auth/process-token', {
+      // callback-serviceの認証エンドポイントにユーザー名とパスワードを送信
+      const response = await fetch('http://localhost:4000/auth/authenticate-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id_token: idToken,
-          access_token: accessToken,
+          username: username,
+          password: password,
           tenant: selectedTenant,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'トークン処理に失敗しました');
+        throw new Error(errorData.error || '認証に失敗しました');
       }
 
       const redirectUrl = await response.text(); // リダイレクトURLをテキストで受け取る

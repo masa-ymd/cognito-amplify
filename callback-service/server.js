@@ -3,6 +3,7 @@ const cors = require('cors');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { CognitoIdentityProviderClient, AdminInitiateAuthCommand } = require("@aws-sdk/client-cognito-identity-provider");
 require('dotenv').config();
 
 const app = express();
@@ -21,8 +22,27 @@ app.use(express.urlencoded({ extended: true }));
 const COGNITO_CONFIG = {
   userPoolId: process.env.COGNITO_USER_POOL_ID,
   clientId: process.env.COGNITO_APP_CLIENT_ID,
+  clientSecret: process.env.COGNITO_APP_CLIENT_SECRET,
   domain: process.env.COGNITO_DOMAIN,
-  region: process.env.AWS_REGION
+  region: process.env.AWS_REGION,
+  awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+};
+
+// Cognito Identity Provider Clientの初期化
+const cognitoClient = new CognitoIdentityProviderClient({
+  region: COGNITO_CONFIG.region,
+  credentials: {
+    accessKeyId: COGNITO_CONFIG.awsAccessKeyId,
+    secretAccessKey: COGNITO_CONFIG.awsSecretAccessKey,
+  },
+});
+
+// SECRET_HASHを計算する関数
+const calculateSecretHash = (username) => {
+  const hmac = crypto.createHmac('sha256', COGNITO_CONFIG.clientSecret);
+  hmac.update(username + COGNITO_CONFIG.clientId);
+  return hmac.digest('base64');
 };
 
 // テナント設定（本番環境ではDB管理を推奨）
@@ -42,17 +62,40 @@ const TENANTS = {
 // 簡易的なインメモリデータストア（本番環境ではRedis, DynamoDBなどを使用）
 const sessionStore = {};
 
-// トークン処理エンドポイント
-app.post('/auth/process-token', async (req, res) => {
+// ユーザー認証エンドポイント
+app.post('/auth/authenticate-user', async (req, res) => {
   try {
-    const { id_token, access_token, tenant } = req.body;
+    const { username, password, tenant } = req.body;
 
-    if (!id_token || !access_token || !tenant) {
-      return res.status(400).json({ error: 'Missing token or tenant information' });
+    if (!username || !password || !tenant) {
+      return res.status(400).json({ error: 'Missing username, password, or tenant information' });
     }
 
-    // IDトークンの妥当性確認
-    const verifiedIdToken = await verifyJwtToken(id_token);
+    // SECRET_HASHを計算
+    const secretHash = calculateSecretHash(username);
+
+    // 1. Cognito AdminInitiateAuth APIを呼び出して認証
+    const authCommand = new AdminInitiateAuthCommand({
+      AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+      ClientId: COGNITO_CONFIG.clientId,
+      UserPoolId: COGNITO_CONFIG.userPoolId,
+      AuthParameters: {
+        USERNAME: username,
+        PASSWORD: password,
+        SECRET_HASH: secretHash, // SECRET_HASHを追加
+      },
+      ClientMetadata: {
+        tenantId: tenant, // カスタム認証フローなどで利用可能
+      },
+    });
+
+    const authResponse = await cognitoClient.send(authCommand);
+
+    const tokens = authResponse.AuthenticationResult;
+    console.log('Cognito AdminInitiateAuth successful.');
+
+    // 2. IDトークンの妥当性確認
+    const verifiedIdToken = await verifyJwtToken(tokens.IdToken);
     console.log('ID Token verified successfully:', verifiedIdToken);
 
     // ユーザー情報の取得（IDトークンから抽出）
@@ -63,7 +106,7 @@ app.post('/auth/process-token', async (req, res) => {
     };
     console.log('User info obtained from ID Token:', userInfo);
 
-    // テナント所属確認の仮実装（本番環境では管理機能APIを呼び出す）
+    // 3. テナント所属確認の仮実装（本番環境では管理機能APIを呼び出す）
     const isUserAuthorizedForTenant = (userSub, tenantId) => {
       // 仮のロジック：
       // テナント1には所属しているとみなす
@@ -83,18 +126,18 @@ app.post('/auth/process-token', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized tenant access' });
     }
 
-    // テナント権限の確認（TENANTSリストに存在するかどうか）
+    // 4. テナント権限の確認（TENANTSリストに存在するかどうか）
     if (!TENANTS[tenant]) {
       console.error('Invalid tenant:', tenant);
       return res.status(400).json({ error: 'Invalid tenant' });
     }
 
-    // 認証情報を簡易ストアに保存し、セッションIDを生成
+    // 5. 認証情報を簡易ストアに保存し、セッションIDを生成
     const sessionId = crypto.randomBytes(16).toString('hex');
     sessionStore[sessionId] = {
       user: userInfo,
       tenant: tenant,
-      tokens: { id_token, access_token }, // トークンをそのまま保存
+      tokens: { id_token: tokens.IdToken, access_token: tokens.AccessToken, refresh_token: tokens.RefreshToken }, // トークンをそのまま保存
       timestamp: new Date().toISOString()
     };
     // 簡易ストアの有効期限を設定（例: 30秒後に削除）
@@ -103,7 +146,7 @@ app.post('/auth/process-token', async (req, res) => {
       console.log(`Session ${sessionId} expired and removed from store.`);
     }, 1000 * 30);
 
-    // テナント専用ドメインへのリダイレクトURLを返す
+    // 6. テナント専用ドメインへのリダイレクトURLを返す
     const redirectUrl = new URL(TENANTS[tenant].redirectUrl);
     redirectUrl.searchParams.set('sessionId', sessionId);
     
@@ -111,8 +154,8 @@ app.post('/auth/process-token', async (req, res) => {
     res.status(200).send(redirectUrl.toString());
 
   } catch (error) {
-    console.error('Token processing error:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    console.error('Authentication error:', error.response?.data || error);
+    res.status(500).json({ error: error.response?.data?.message || error.message || 'Internal server error' });
   }
 });
 
