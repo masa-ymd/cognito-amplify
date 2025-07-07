@@ -54,7 +54,7 @@ localhost:5000 - テナント専用ドメイン (React)
 
 ### 1. 認証フローのセキュリティ
 
-*   **現在の実装**: `login-app`がユーザー名とパスワードを`callback-service`にPOSTし、`callback-service`がサーバーサイドでCognitoの`AdminInitiateAuth` APIを呼び出して認証を行います。これは、OAuth 2.0のResource Owner Password Credentials (ROPC) Grantに似たフローです。
+*   **現在の実装**: `login-app`がユーザー名とパスワードを`callback-service`にPOSTし、`callback-service`がサーバーサイドでCognitoの`AdminInitiateAuth` APIを呼び出して認証を行います。これは、OAuth 2.0のResource Owner Password Credentials (ROPC) Grantに似たユーザー体験を提供しますが、実際の認証処理はサーバーサイドで行われるため、より安全です。
 *   **利点**: ユーザー名とパスワード、およびトークンがブラウザに直接露出する機会を最小限に抑えられます。認証の機密性の高い部分はすべてサーバーサイドで行われます。
 *   **考慮点**: `AdminInitiateAuth`は管理者権限を必要とするAPIであり、`callback-service`がCognitoユーザープールに対する適切なIAM権限を持つ必要があります。この権限は最小限に絞り、慎重に管理されるべきです。
 
