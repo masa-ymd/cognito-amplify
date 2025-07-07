@@ -52,6 +52,15 @@ localhost:5000 - テナント専用ドメイン (React)
 
 ## セキュリティ考慮事項
 
+### 認証フローのセキュリティ比較
+
+| フロー名 | パスワードの扱い | トークンの扱い | セキュリティ評価 | 備考 |
+| :------- | :--------------- | :------------- | :--------------- | :--- |
+| **現在のフロー**<br/>(ROPC-like with Server-Side `AdminInitiateAuth`) | `login-app` (ブラウザ) → `callback-service` (サーバー) | Cognito → `callback-service` (サーバー) | **中〜高** | パスワードがブラウザを通過するが、トークンはブラウザに露出しない。カスタムUIとセキュリティのバランス。 |
+| **純粋な ROPC Grant**<br/>(クライアントサイド) | `login-app` (ブラウザ) → Cognito (直接) | Cognito → `login-app` (ブラウザ) | **低** | パスワードとトークンが両方ブラウザに露出。XSS攻撃に非常に脆弱。**非推奨。** |
+| **Authorization Code Grant with PKCE**<br/>(Hosted UI またはリダイレクトベースのカスタムUI) | ユーザーがCognitoの安全な環境に直接入力 | Cognito → ブラウザ (コードのみ) → `login-app` (コード交換) → トークンはブラウザに露出 | **高** | パスワードがブラウザのJSコードに触れない。トークンはブラウザに露出するが、PKCEでコードの乗っ取りを防ぐ。 |
+| **Authorization Code Grant with PKCE**<br/>(サーバーサイドBFF/Backend-as-Client) | ユーザーがCognitoの安全な環境に直接入力 | Cognito → `callback-service` (サーバー) | **最高** | パスワードもトークンもブラウザのJSコードに触れない。認証のベストプラクティス。 |
+
 ### 1. 認証フローのセキュリティ
 
 *   **現在の実装**: `login-app`がユーザー名とパスワードを`callback-service`にPOSTし、`callback-service`がサーバーサイドでCognitoの`AdminInitiateAuth` APIを呼び出して認証を行います。これは、OAuth 2.0のResource Owner Password Credentials (ROPC) Grantに似たユーザー体験を提供しますが、実際の認証処理はサーバーサイドで行われるため、より安全です。
