@@ -121,11 +121,16 @@ cd tenant-app && npm install && cd ..
 
 ### 2. 環境変数の設定
 
+`callback-service`ディレクトリにある`.env.example`ファイルをコピーして`.env`ファイルを作成し、ご自身の環境に合わせて値を設定してください。
 
+```bash
+cp callback-service/.env.example callback-service/.env
+```
 
-#### callback-service/.env
+`callback-service/.env`の中身を以下のように編集します。
 
 ```env
+# .env
 COGNITO_USER_POOL_ID=YOUR_USER_POOL_ID
 COGNITO_APP_CLIENT_ID=YOUR_APP_CLIENT_ID
 COGNITO_APP_CLIENT_SECRET=YOUR_APP_CLIENT_SECRET
